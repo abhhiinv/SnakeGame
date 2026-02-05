@@ -17,7 +17,7 @@ public class Board extends JPanel implements ActionListener{
     private int apple_y;
 
     private final int x[] = new int[ALL_DOTS];
-    private final int y[] = new int[DOT_SIZE];
+    private final int y[] = new int[ALL_DOTS];
 
     private boolean leftDirection = false;
     private boolean rightDirection = true;
@@ -27,6 +27,7 @@ public class Board extends JPanel implements ActionListener{
     private boolean inGame = true;
 
     private int dots;
+    private int score;
     private Timer timer;
 
     Board() {
@@ -49,6 +50,7 @@ public class Board extends JPanel implements ActionListener{
     }
     public void initGame(){
         dots = 3;
+        score = 0;
 
         for(int i=0; i<dots; i++){
             y[i]=50;
@@ -78,6 +80,10 @@ public class Board extends JPanel implements ActionListener{
 
     public void draw(Graphics g){
         if(inGame){
+
+            g.setColor(Color.WHITE);
+            g.setFont(new Font("SAN_SERIF", Font.BOLD, 12));
+            g.drawString("Score: " + score, 10, 20);
             g.drawImage(apple,apple_x,apple_y,this);
             for (int i=0; i<dots; i++){
                 if(i==0){
@@ -94,7 +100,7 @@ public class Board extends JPanel implements ActionListener{
     }
 
     public void gameOver(Graphics g){
-        String msg = "Game Over!";
+        String msg = "Game Over! Score : " + score;
         Font font = new Font("SAN_SERIF", Font.BOLD, 14);
         FontMetrics metrices = getFontMetrics(font);
         
@@ -126,6 +132,7 @@ public class Board extends JPanel implements ActionListener{
     public void checkApple() {
         if ((x[0] == apple_x) && (y[0] == apple_y)) {
             dots++;
+            score++;
             locateApple();
         }
     }
