@@ -5,11 +5,10 @@ public class SnakeGame extends JFrame{
         add(new Board());
         pack(); //to refresh frame
 
-        setSize(300,300);
         setLocationRelativeTo(null);
-        setVisible(true);
+        setResizable(false);
     }
     public static void main(String[] args) {
-        new SnakeGame();
+        new SnakeGame().setVisible(true);
     }
 }
