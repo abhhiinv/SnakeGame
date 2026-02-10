@@ -3,7 +3,7 @@ import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
 
-public class Board extends JPanel implements ActionListener{
+public class Board extends JPanel implements ActionListener,MouseListener{
     
     private Image apple;
     private Image dot;
@@ -29,9 +29,11 @@ public class Board extends JPanel implements ActionListener{
     private int dots;
     private int score;
     private Timer timer;
+    private Rectangle playAgainButton;
 
     Board() {
         addKeyListener(new TAdapter());
+        addMouseListener(this);
         setBackground(new Color(149,209,1));//bg color
         setPreferredSize(new Dimension(300,300));
         setFocusable(true);
@@ -61,6 +63,13 @@ public class Board extends JPanel implements ActionListener{
 
         timer = new Timer(140,this);
         timer.start();
+
+        // Reset game state
+        inGame = true;
+        leftDirection = false;
+        rightDirection = true;
+        upDirection = false;
+        downDirection = false;
     }
 
     public void locateApple() {
@@ -107,6 +116,31 @@ public class Board extends JPanel implements ActionListener{
         g.setColor(Color.WHITE);
         g.setFont(font);
         g.drawString(msg, (300 - metrices.stringWidth(msg)) / 2, 300/2);
+
+         // Draw "Play Again" button
+        String buttonText = "Play Again";
+        Font buttonFont = new Font("SAN_SERIF", Font.BOLD, 12);
+        FontMetrics buttonMetrics = getFontMetrics(buttonFont);
+        
+        int buttonWidth = buttonMetrics.stringWidth(buttonText) + 20;
+        int buttonHeight = 30;
+        int buttonX = (300 - buttonWidth) / 2;
+        int buttonY = 300/2 + 10;
+        
+        // Store button bounds for click detection
+        playAgainButton = new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
+        
+        // Draw button background
+        g.setColor(new Color(100, 150, 50));
+        g.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+        
+        // Draw button border
+        g.setColor(Color.WHITE);
+        g.drawRect(buttonX, buttonY, buttonWidth, buttonHeight);
+        
+        // Draw button text
+        g.setFont(buttonFont);
+        g.drawString(buttonText, buttonX + 10, buttonY + 20);
     }
 
     public void move(){
@@ -171,6 +205,28 @@ public class Board extends JPanel implements ActionListener{
         
         repaint();
     }
+
+    @Override
+    public void mouseClicked(MouseEvent e) {
+        if (!inGame && playAgainButton != null) {
+            if (playAgainButton.contains(e.getPoint())) {
+                initGame();
+                repaint();
+            }
+        }
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {}
+
+    @Override
+    public void mouseReleased(MouseEvent e) {}
+
+    @Override
+    public void mouseEntered(MouseEvent e) {}
+
+    @Override
+    public void mouseExited(MouseEvent e) {}
 
     public class TAdapter extends KeyAdapter {
         @Override
