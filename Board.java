@@ -34,7 +34,7 @@ public class Board extends JPanel implements ActionListener,MouseListener{
     Board() {
         addKeyListener(new TAdapter());
         addMouseListener(this);
-        setBackground(new Color(149,209,1));//bg color
+        setBackground(new Color(168,230,14));//bg color
         setPreferredSize(new Dimension(300,300));
         setFocusable(true);
 
@@ -90,7 +90,7 @@ public class Board extends JPanel implements ActionListener,MouseListener{
     public void draw(Graphics g){
         if(inGame){
 
-            g.setColor(Color.WHITE);
+            g.setColor(Color.BLACK);
             g.setFont(new Font("SAN_SERIF", Font.BOLD, 12));
             g.drawString("Score: " + score, 10, 20);
             g.drawImage(apple,apple_x,apple_y,this);
@@ -113,7 +113,7 @@ public class Board extends JPanel implements ActionListener,MouseListener{
         Font font = new Font("SAN_SERIF", Font.BOLD, 14);
         FontMetrics metrices = getFontMetrics(font);
         
-        g.setColor(Color.WHITE);
+        g.setColor(Color.BLACK);
         g.setFont(font);
         g.drawString(msg, (300 - metrices.stringWidth(msg)) / 2, 300/2);
 
@@ -135,7 +135,7 @@ public class Board extends JPanel implements ActionListener,MouseListener{
         g.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
         
         // Draw button border
-        g.setColor(Color.WHITE);
+        g.setColor(Color.BLACK);
         g.drawRect(buttonX, buttonY, buttonWidth, buttonHeight);
         
         // Draw button text
