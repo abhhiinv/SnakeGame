@@ -1,335 +1,287 @@
-
 import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
 
-/**
- * Board.java — The main game panel for the Snake Game.
- *
- * This class extends JPanel to serve as the drawing surface and
- * implements ActionListener (for the game timer tick) and
- * MouseListener (for detecting "Play Again" button clicks).
- */
-public class Board extends JPanel implements ActionListener, MouseListener {
+public class Board extends JPanel implements ActionListener {
 
     private Image apple;
     private Image dot;
     private Image head;
 
-    // ---------------------------------------------------------------
-    // GAME CONSTANTS — fixed values that define board dimensions
-    // ---------------------------------------------------------------
-    private final int ALL_DOTS = 900;          // Maximum possible number of snake segments (300x300 board / 10px each = 900 slots)
-    private final int DOT_SIZE = 10;           // Size (in pixels) of each snake segment and the apple
-    private final int RANDOM_POSITION = 29;    // Upper bound for random apple placement (0 to 28 → 0 to 280px in steps of 10)
+    private final int ALL_DOTS    = 900;
+    private final int DOT_SIZE    = 20;
+    private final int RANDOM_POSITION = 29;
+    private final int BOARD_SIZE  = 600;
 
-    private int apple_x;  // X-coordinate of the apple
-    private int apple_y;  // Y-coordinate of the apple
+    // Normal apple
+    private int apple_x, apple_y;
 
-    // ---------------------------------------------------------------
-    // SNAKE POSITION ARRAYS — parallel arrays storing each segment's coordinates
-    // Index 0 is always the head; higher indices are body segments
-    // ---------------------------------------------------------------
-    private final int x[] = new int[ALL_DOTS];  // X-coordinates of all snake segments
-    private final int y[] = new int[ALL_DOTS];  // Y-coordinates of all snake segments
+    // Special apple
+    private boolean specialAppleActive = false;
+    private int special_x, special_y;
+    private int specialAppleTimer = 0;          // counts actionPerformed ticks
+    private final int SPECIAL_APPLE_DURATION = 71; // ~10 sec at 140ms; recalculated per difficulty
+    private int specialAppleDuration;
+    private int normalApplesEaten = 0;          // resets after spawning special
+    private final int APPLES_FOR_SPECIAL = 5;
+    private final int SPECIAL_POINTS = 5;
 
-    // ---------------------------------------------------------------
-    // MOVEMENT FLAGS — only one can be true at a time (current direction)
-    // Prevents the snake from instantly reversing into itself
-    // ---------------------------------------------------------------
-    private boolean leftDirection  = false;  // Snake moving left
-    private boolean rightDirection = true;   // Snake starts moving right by default
-    private boolean upDirection    = false;  // Snake moving up
-    private boolean downDirection  = false;  // Snake moving down
+    private final int x[] = new int[ALL_DOTS];
+    private final int y[] = new int[ALL_DOTS];
 
-    // ---------------------------------------------------------------
-    // GAME STATE
-    // ---------------------------------------------------------------
-    private boolean inGame = true;  // true → game is running; false → game over
+    private boolean leftDirection  = false;
+    private boolean rightDirection = true;
+    private boolean upDirection    = false;
+    private boolean downDirection  = false;
 
-    // ---------------------------------------------------------------
-    // GAME VARIABLES
-    // ---------------------------------------------------------------
-    private int dots;                    // Current length (number of segments) of the snake
-    private int score;                   // Player's current score (increments on each apple eaten)
-    private Timer timer;                 // Swing Timer that drives the game loop (fires actionPerformed repeatedly)
-    private Rectangle playAgainButton;   // Bounding box of the "Play Again" button (used for click detection on game over)
+    private boolean inGame = true;
 
-    // ---------------------------------------------------------------
-    // CONSTRUCTOR — sets up the game panel
-    // ---------------------------------------------------------------
-    Board() {
-        addKeyListener(new TAdapter());              // Register keyboard listener for arrow key input
-        addMouseListener(this);                     // Register mouse listener for "Play Again" button clicks
-        setBackground(new Color(168, 230, 14));     // Set the board background to a bright green colour
-        setPreferredSize(new Dimension(300, 300));  // Fix the panel size to 300×300 pixels
-        setFocusable(true);                         // Allow this panel to receive keyboard focus
+    private int dots;
+    private int score;
+    private int timerDelay;
+    private Timer timer;
 
-        loadImages();  // Load all sprite images from resources
-        initGame();    // Set up the initial game state and start the timer
+    // Callback to show menu again after game over + Play Again
+    public interface GameOverListener {
+        void onGameOver();
+    }
+    private GameOverListener gameOverListener;
+
+    Board(int timerDelay, GameOverListener gameOverListener) {
+        this.timerDelay       = timerDelay;
+        this.gameOverListener = gameOverListener;
+        // Special apple lasts 10 seconds regardless of speed
+        this.specialAppleDuration = (int)(10000.0 / timerDelay);
+
+        addKeyListener(new TAdapter());
+        setBackground(new Color(149, 209, 1));
+        setPreferredSize(new Dimension(BOARD_SIZE, BOARD_SIZE));
+        setFocusable(true);
+
+        loadImages();
+        initGame();
     }
 
-    // ---------------------------------------------------------------
-    // loadImages() — loads the sprite images from the icons/ folder
-    // Called once during construction
-    // ---------------------------------------------------------------
     public void loadImages() {
         ImageIcon i1 = new ImageIcon(ClassLoader.getSystemResource("icons/apple.png"));
-        apple = i1.getImage();  // Store the apple sprite
-
+        apple = i1.getImage();
         ImageIcon i2 = new ImageIcon(ClassLoader.getSystemResource("icons/dot.png"));
-        dot = i2.getImage();    // Store the body-segment sprite
-
+        dot = i2.getImage();
         ImageIcon i3 = new ImageIcon(ClassLoader.getSystemResource("icons/head.png"));
-        head = i3.getImage();   // Store the snake-head sprite
+        head = i3.getImage();
     }
 
-    // ---------------------------------------------------------------
-    // initGame() — resets all game variables and starts/restarts the timer
-    // Called at construction and when the player clicks "Play Again"
-    // ---------------------------------------------------------------
     public void initGame() {
-        dots  = 3;   // Snake starts with 3 segments
-        score = 0;   // Reset score to zero
+        dots  = 3;
+        score = 0;
+        normalApplesEaten  = 0;
+        specialAppleActive = false;
+        specialAppleTimer  = 0;
 
-        // Place the initial snake segments horizontally at y=50,
-        // starting at x=50 for the head and stepping back by DOT_SIZE for each body segment
-        for (int i = 0; i < dots; i++) {
-            y[i] = 50;
-            x[i] = 50 - (i * DOT_SIZE);
-        }
-
-        locateApple();  // Randomly place the first apple on the board
-
-        // Create (or restart) the Swing Timer with a 140ms delay between ticks
-        // Each tick triggers actionPerformed(), which advances the game by one step
-        timer = new Timer(140, this);
-        timer.start();
-
-        // Reset direction flags so the snake starts moving right
-        inGame         = true;
         leftDirection  = false;
         rightDirection = true;
         upDirection    = false;
         downDirection  = false;
+        inGame = true;
+
+        for (int i = 0; i < dots; i++) {
+            y[i] = 100;
+            x[i] = 100 - (i * DOT_SIZE);
+        }
+
+        locateApple();
+
+        timer = new Timer(timerDelay, this);
+        timer.start();
     }
 
-    // ---------------------------------------------------------------
-    // locateApple() — places the apple at a new random position on the grid
-    // Both x and y are snapped to the DOT_SIZE grid (multiples of 10)
-    // ---------------------------------------------------------------
     public void locateApple() {
-        int r  = (int) (Math.random() * RANDOM_POSITION);  // Random column index (0–28)
-        apple_x = r * DOT_SIZE;                            // Convert to pixel x-coordinate
-
-        r = (int) (Math.random() * RANDOM_POSITION);       // Random row index (0–28)
-        apple_y = r * DOT_SIZE;                            // Convert to pixel y-coordinate
+        int r = (int)(Math.random() * RANDOM_POSITION);
+        apple_x = r * DOT_SIZE;
+        r = (int)(Math.random() * RANDOM_POSITION);
+        apple_y = r * DOT_SIZE;
     }
 
-    // ---------------------------------------------------------------
-    // paintComponent() — called automatically by Swing whenever the panel needs repainting
-    // Delegates all actual drawing to draw()
-    // ---------------------------------------------------------------
+    public void locateSpecialApple() {
+        int r;
+        do {
+            r = (int)(Math.random() * RANDOM_POSITION);
+            special_x = r * DOT_SIZE;
+            r = (int)(Math.random() * RANDOM_POSITION);
+            special_y = r * DOT_SIZE;
+        } while (special_x == apple_x && special_y == apple_y); // avoid overlap
+        specialAppleActive = true;
+        specialAppleTimer  = 0;
+    }
+
+    @Override
     public void paintComponent(Graphics g) {
-        super.paintComponent(g);  // Paint the background (calls JPanel's default paint)
-        draw(g);                  // Draw game elements on top
+        super.paintComponent(g);
+        draw(g);
     }
 
-    // ---------------------------------------------------------------
-    // draw() — renders the game when running, or triggers the game-over screen
-    // ---------------------------------------------------------------
     public void draw(Graphics g) {
         if (inGame) {
-            // Draw the current score in the top-left corner
-            g.setColor(Color.BLACK);
-            g.setFont(new Font("SAN_SERIF", Font.BOLD, 12));
-            g.drawString("Score: " + score, 10, 20);
+            // Score
+            g.setColor(Color.WHITE);
+            g.setFont(new Font("SansSerif", Font.BOLD, 24));
+            g.drawString("Score: " + score, 20, 40);
 
-            // Draw the apple at its current position
+            // Normal apple
             g.drawImage(apple, apple_x, apple_y, this);
 
-            // Draw each snake segment; index 0 uses the head image, all others use the dot (body) image
+            // Special apple — draw as glowing gold circle if no custom icon
+            if (specialAppleActive) {
+                drawSpecialApple(g);
+            }
+
+            // Snake
             for (int i = 0; i < dots; i++) {
                 if (i == 0) {
-                    g.drawImage(head, x[i], y[i], this);  // Head
+                    g.drawImage(head, x[i], y[i], this);
                 } else {
-                    g.drawImage(dot, x[i], y[i], this);   // Body segment
+                    g.drawImage(dot, x[i], y[i], this);
                 }
             }
 
-            // Sync the display for smoother rendering on some platforms (Linux fix)
+            // Special apple countdown bar
+            if (specialAppleActive) {
+                drawTimerBar(g);
+            }
+
             Toolkit.getDefaultToolkit().sync();
         } else {
-            // Game is over — show the game-over screen
             gameOver(g);
         }
     }
 
-    // ---------------------------------------------------------------
-    // gameOver() — renders the game-over message and a "Play Again" button
-    // Called by draw() when inGame is false
-    // ---------------------------------------------------------------
-    public void gameOver(Graphics g) {
-        // Build and centre the "Game Over" message string
-        String msg = "Game Over! Score : " + score;
-        Font font = new Font("SAN_SERIF", Font.BOLD, 14);
-        FontMetrics metrices = getFontMetrics(font);
-
-        g.setColor(Color.BLACK);
-        g.setFont(font);
-        // Centre the message horizontally and place it at the vertical midpoint
-        g.drawString(msg, (300 - metrices.stringWidth(msg)) / 2, 300 / 2);
-
-        // --- "Play Again" button layout calculations ---
-        String buttonText = "Play Again";
-        Font buttonFont = new Font("SAN_SERIF", Font.BOLD, 12);
-        FontMetrics buttonMetrics = getFontMetrics(buttonFont);
-
-        int buttonWidth  = buttonMetrics.stringWidth(buttonText) + 20; // Add horizontal padding
-        int buttonHeight = 30;
-        int buttonX      = (300 - buttonWidth) / 2;   // Horizontally centred
-        int buttonY      = 300 / 2 + 10;              // Just below the "Game Over" text
-
-        // Save button bounds so mouseClicked() can detect when the user clicks it
-        playAgainButton = new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
-
-        // Draw button background (green fill)
-        g.setColor(new Color(100, 150, 50));
-        g.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
-
-        // Draw button border (black outline)
-        g.setColor(Color.BLACK);
-        g.drawRect(buttonX, buttonY, buttonWidth, buttonHeight);
-
-        // Draw the button label text
-        g.setFont(buttonFont);
-        g.drawString(buttonText, buttonX + 10, buttonY + 20);
+    private void drawSpecialApple(Graphics g) {
+        // Gold pulsing circle to stand out from normal apple
+        g.setColor(new Color(3, 150, 255));
+        g.fillOval(special_x, special_y, DOT_SIZE, DOT_SIZE);
+        g.setColor(new Color(34, 97, 224));
+        g.drawOval(special_x, special_y, DOT_SIZE, DOT_SIZE);
     }
 
-    // ---------------------------------------------------------------
-    // move() — shifts all snake segments forward by one step in the current direction
-    // The body "follows" the head by copying each segment's position from the one ahead of it
-    // ---------------------------------------------------------------
+    private void drawTimerBar(Graphics g) {
+        int barWidth = BOARD_SIZE - 40;
+        int remaining = specialAppleDuration - specialAppleTimer;
+        int filledWidth = (int)((double) remaining / specialAppleDuration * barWidth);
+
+        g.setColor(Color.DARK_GRAY);
+        g.fillRect(20, BOARD_SIZE - 24, barWidth, 12);
+
+        g.setColor(new Color(3, 150, 255));
+        g.fillRect(20, BOARD_SIZE - 24, filledWidth, 12);
+    }
+
+    public void gameOver(Graphics g) {
+        // Dim background
+        g.setColor(new Color(0, 0, 0, 150));
+        g.fillRect(0, 0, BOARD_SIZE, BOARD_SIZE);
+
+        String msg = "Game Over!  Score: " + score;
+        Font font = new Font("SansSerif", Font.BOLD, 28);
+        FontMetrics fm = getFontMetrics(font);
+
+        g.setColor(Color.WHITE);
+        g.setFont(font);
+        g.drawString(msg, (BOARD_SIZE - fm.stringWidth(msg)) / 2, BOARD_SIZE / 2 - 40);
+
+        // Play Again button drawn as text — actual button added below
+    }
+
+    public void checkApple() {
+        // Normal apple
+        if (x[0] == apple_x && y[0] == apple_y) {
+            dots++;
+            score++;
+            normalApplesEaten++;
+            locateApple();
+
+            // Spawn special apple every 5 normal apples
+            if (normalApplesEaten % APPLES_FOR_SPECIAL == 0) {
+                locateSpecialApple();
+            }
+        }
+
+        // Special apple
+        if (specialAppleActive && x[0] == special_x && y[0] == special_y) {
+            dots++;
+            score += SPECIAL_POINTS;
+            specialAppleActive = false;
+        }
+    }
+
+    public void checkCollision() {
+        for (int i = dots; i > 0; i--) {
+            if ((i > 4) && (x[0] == x[i]) && (y[0] == y[i])) {
+                inGame = false;
+            }
+        }
+        if (y[0] >= BOARD_SIZE) inGame = false;
+        if (x[0] >= BOARD_SIZE) inGame = false;
+        if (y[0] < 0)           inGame = false;
+        if (x[0] < 0)           inGame = false;
+
+        if (!inGame) {
+            timer.stop();
+            if (gameOverListener != null) {
+                gameOverListener.onGameOver();
+            }
+        }
+    }
+
     public void move() {
-        // Shift every body segment one position toward the tail (from back to front)
-        // so that segment i takes the previous position of segment i-1
         for (int i = dots; i > 0; i--) {
             x[i] = x[i - 1];
             y[i] = y[i - 1];
         }
-
-        // Move the head (index 0) one DOT_SIZE step in the active direction
-        if (leftDirection)  { x[0] = x[0] - DOT_SIZE; }
-        if (rightDirection) { x[0] = x[0] + DOT_SIZE; }
-        if (upDirection)    { y[0] = y[0] - DOT_SIZE; }
-        if (downDirection)  { y[0] = y[0] + DOT_SIZE; }
+        if (leftDirection)  x[0] -= DOT_SIZE;
+        if (rightDirection) x[0] += DOT_SIZE;
+        if (upDirection)    y[0] -= DOT_SIZE;
+        if (downDirection)  y[0] += DOT_SIZE;
     }
-
-    // ---------------------------------------------------------------
-    // checkApple() — tests whether the snake's head is on the apple
-    // If so, grow the snake, increment the score, and move the apple
-    // ---------------------------------------------------------------
-    public void checkApple() {
-        if ((x[0] == apple_x) && (y[0] == apple_y)) {
-            dots++;           // Grow the snake by one segment
-            score++;          // Increase the player's score
-            locateApple();    // Randomly reposition the apple
-        }
-    }
-
-    // ---------------------------------------------------------------
-    // checkCollision() — ends the game if the snake hits itself or a wall
-    // ---------------------------------------------------------------
-    public void checkCollision() {
-        // Check if the head overlaps any body segment beyond the 3rd segment
-        // (shorter snakes can't physically overlap themselves)
-        for (int i = dots - 1; i > 3; i--) {
-            if ((x[0] == x[i]) && (y[0] == y[i])) {
-                inGame = false;  // Head touched a body segment → game over
-            }
-        }
-
-        // Check if the snake has crossed any of the four board boundaries
-        if (y[0] >= 300) { inGame = false; }  // Hit the bottom wall
-        if (x[0] >= 300) { inGame = false; }  // Hit the right wall
-        if (y[0] < 0)    { inGame = false; }  // Hit the top wall
-        if (x[0] < 0)    { inGame = false; }  // Hit the left wall
-
-        // If a collision was detected, stop the game timer
-        if (!inGame) {
-            timer.stop();
-        }
-    }
-
-    // ---------------------------------------------------------------
-    // actionPerformed() — the game loop, called on every timer tick (every 140ms)
-    // Performs one frame: check apple, check collisions, move snake, then repaint
-    // ---------------------------------------------------------------
-    public void actionPerformed(ActionEvent ae) {
-        if (inGame) {
-            checkApple();      // Did the snake eat the apple this frame?
-            checkCollision();  // Did the snake hit a wall or itself?
-            move();            // Advance the snake one step forward
-        }
-
-        repaint();  // Trigger paintComponent() to redraw the updated board
-    }
-
-    // ---------------------------------------------------------------
-    // MOUSE LISTENER — only mouseClicked() is used (for the "Play Again" button)
-    // The others are required by the MouseListener interface but left empty
-    // ---------------------------------------------------------------
 
     @Override
-    public void mouseClicked(MouseEvent e) {
-        // If the game is over and the player clicks inside the "Play Again" button area, restart
-        if (!inGame && playAgainButton != null) {
-            if (playAgainButton.contains(e.getPoint())) {
-                initGame();  // Reset all game variables and restart the timer
-                repaint();   // Immediately redraw to show the fresh board
+    public void actionPerformed(ActionEvent ae) {
+        if (inGame) {
+            checkApple();
+            checkCollision();
+            move();
+
+            // Tick special apple timer
+            if (specialAppleActive) {
+                specialAppleTimer++;
+                if (specialAppleTimer >= specialAppleDuration) {
+                    specialAppleActive = false; // expired
+                }
             }
         }
+        repaint();
     }
 
-    @Override public void mousePressed(MouseEvent e)  { /* Not used */ }
-    @Override public void mouseReleased(MouseEvent e) { /* Not used */ }
-    @Override public void mouseEntered(MouseEvent e)  { /* Not used */ }
-    @Override public void mouseExited(MouseEvent e)   { /* Not used */ }
-
-    // ---------------------------------------------------------------
-    // TAdapter — inner class that handles keyboard input (arrow keys)
-    // Prevents the snake from reversing directly into itself by checking
-    // that the new direction is not the exact opposite of the current one
-    // ---------------------------------------------------------------
     public class TAdapter extends KeyAdapter {
-
         @Override
         public void keyPressed(KeyEvent e) {
-            int key = e.getKeyCode();  // Get the code of the pressed key
+            int key = e.getKeyCode();
 
-            // LEFT arrow — only allowed if currently not moving right
-            if (key == KeyEvent.VK_LEFT && (!rightDirection)) {
+            if (key == KeyEvent.VK_LEFT && !rightDirection) {
                 leftDirection  = true;
                 upDirection    = false;
                 downDirection  = false;
             }
-
-            // RIGHT arrow — only allowed if currently not moving left
-            if (key == KeyEvent.VK_RIGHT && (!leftDirection)) {
+            if (key == KeyEvent.VK_RIGHT && !leftDirection) {
                 rightDirection = true;
                 upDirection    = false;
                 downDirection  = false;
             }
-
-            // UP arrow — only allowed if currently not moving down
-            if (key == KeyEvent.VK_UP && (!downDirection)) {
+            if (key == KeyEvent.VK_UP && !downDirection) {
                 upDirection    = true;
                 leftDirection  = false;
                 rightDirection = false;
             }
-
-            // DOWN arrow — only allowed if currently not moving up
-            if (key == KeyEvent.VK_DOWN && (!upDirection)) {
+            if (key == KeyEvent.VK_DOWN && !upDirection) {
                 downDirection  = true;
                 leftDirection  = false;
                 rightDirection = false;
