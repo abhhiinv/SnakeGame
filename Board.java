@@ -33,7 +33,7 @@ public class Board extends JPanel implements ActionListener {
     private boolean specialAppleActive = false;
     private int special_x, special_y;
     private int specialAppleTimer = 0;
-    private final int SPECIAL_APPLE_DURATION = 71; // kept for reference
+    //private final int SPECIAL_APPLE_DURATION = 71; // kept for reference
     private int specialAppleDuration;
     private int normalApplesEaten = 0;
     private final int APPLES_FOR_SPECIAL = 5;
@@ -342,7 +342,7 @@ public class Board extends JPanel implements ActionListener {
     }
 
     // =========================================================================
-    // Game-over screen — MODIFIED to show leaderboard
+    // Game-over screen
     // =========================================================================
     public void gameOver(Graphics g) {
         // Dim the board
