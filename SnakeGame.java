@@ -7,101 +7,100 @@ import javax.swing.*;
  */
 public class SnakeGame extends JFrame {
 
-    // CardLayout allows swapping between "cards" (MENU panel and GAME panel)
     private CardLayout cardLayout;
     private JPanel container;
 
-    // Panels for the two different screens
     private MenuPanel menuPanel;
     private Board boardPanel;
 
-    // String keys used by CardLayout to identify each screen
-    private final String MENU  = "MENU";
-    private final String GAME  = "GAME";
+    private final String MENU = "MENU";
+    private final String GAME = "GAME";
 
-    /**
-     * Sets up the main window, layout and initial menu screen.
-     */
     SnakeGame() {
         super("Snake Xenia");
 
         cardLayout = new CardLayout();
         container  = new JPanel(cardLayout);
 
-        // Build the menu panel.
-        // When a difficulty is chosen, startGame(...) is called with the selected timer delay.
         menuPanel = new MenuPanel(this::startGame);
-
-        // Add the menu as the first screen
         container.add(menuPanel, MENU);
 
-        // Add container to the frame and configure basic window properties
         add(container);
         pack();
-        setLocationRelativeTo(null);                 // center on screen
+        setLocationRelativeTo(null);
         setResizable(false);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        showMenu(); // Display the menu card
+        showMenu();
     }
 
-    /**
-     * Shows the menu screen using the CardLayout.
-     */
     private void showMenu() {
         cardLayout.show(container, MENU);
     }
 
     /**
-     * Starts a new game with the specific timer delay chosen in the menu.
-     * If a game is already running, its board is removed and replaced.
+     * Converts a timer delay back to a human-readable difficulty label.
+     * Must match the values set in MenuPanel.
+     */
+    private String difficultyLabel(int timerDelay) {
+        if (timerDelay >= 200) return "Easy";
+        if (timerDelay >= 140) return "Medium";
+        return "Hard";
+    }
+
+    /**
+     * Starts a new game.
+     * MODIFIED: passes difficulty label to Board so it can save it with the score.
      */
     private void startGame(int timerDelay) {
-        // Remove old board if exists so we can create a fresh one
         if (boardPanel != null) {
             container.remove(boardPanel);
         }
 
-        // Create the game board.
-        // On game over, we show a "Play Again / Quit" dialog.
-        boardPanel = new Board(timerDelay, () -> showPlayAgainOverlay(timerDelay));
+        String label = difficultyLabel(timerDelay); // ADDED
+
+        boardPanel = new Board(timerDelay, label, () -> showPlayAgainOverlay(timerDelay)); // MODIFIED
         container.add(boardPanel, GAME);
 
-        // Switch to the game screen and give keyboard focus to the board
         cardLayout.show(container, GAME);
         boardPanel.requestFocusInWindow();
     }
 
-    /**
-     * Shows a dialog asking the player if they want to play again.
-     * It appears shortly after the game over text so the player can see it.
-     */
     private void showPlayAgainOverlay(int lastDelay) {
-        // Delay dialog slightly so "Game Over" text is visible first
         Timer t = new Timer(600, e -> {
-            int choice = JOptionPane.showOptionDialog(
-                this,
+            // Build dialog manually so we can position it at the top of the window
+            JOptionPane pane = new JOptionPane(
                 "Would you like to play again?",
-                "Game Over",
-                JOptionPane.YES_NO_OPTION,
                 JOptionPane.QUESTION_MESSAGE,
+                JOptionPane.YES_NO_OPTION,
                 null,
                 new String[]{"Play Again", "Quit"},
                 "Play Again"
             );
+            JDialog dialog = pane.createDialog(this, "Game Over");
+
+            // Horizontally center over the frame, 10px from the top
+            java.awt.Point frameLoc = this.getLocationOnScreen();
+            int dialogX = frameLoc.x + (this.getWidth() - dialog.getWidth()) / 2;
+            int dialogY = frameLoc.y + 450;
+            dialog.setLocation(dialogX, dialogY);
+            dialog.setVisible(true);
+
+            // Read result — null means the dialog was closed without choosing
+            Object value = pane.getValue();
+            int choice = (value == null || value.equals("Quit"))
+                    ? JOptionPane.NO_OPTION : JOptionPane.YES_OPTION;
+
             if (choice == JOptionPane.YES_OPTION) {
-                showMenu(); // Back to difficulty menu
+                showMenu();
             } else {
-                System.exit(0); // Exit the application completely
+                System.exit(0);
             }
         });
-        t.setRepeats(false); // run only once
+        t.setRepeats(false);
         t.start();
     }
 
-    /**
-     * Entry point: creates the main window on the Swing event dispatch thread.
-     */
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new SnakeGame().setVisible(true));
     }
